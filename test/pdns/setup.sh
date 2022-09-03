@@ -40,7 +40,7 @@ else
 fi
 # Create zone ftl
 pdnsutil create-zone ftl ns1.ftl
-pdnsutil disable-dnssec ftl
+pdnsutil add-record ftl. . SOA "ns1.ftl. hostmaster.ftl. 1 10800 3600 604800 3600"
 
 # Create A records
 pdnsutil add-record ftl. a A 192.168.1.1
@@ -92,10 +92,17 @@ pdnsutil add-record ftl. naptr NAPTR '20 10 "s" "http+N2L+N2C+N2R" "" ftl.'
 pdnsutil add-record ftl. mx MX "50 ns1.ftl."
 
 # SVCB + HTTPS
-pdnsutil add-record ftl. svcb SVCB '1 port="80"'
+if ! pdnsutil add-record ftl. svcb SVCB '1 port="80"'; then
+  # see RFC3597: Handling of Unknown DNS Resource Record (RR) Types
+  # and https://ypcs.fi/howto/2020/09/30/announce-https-via-dns/
+  pdnsutil add-record ftl. svcb TYPE64 "\# 13 000109706F72743D2238302200"
+fi
 
 # HTTPS
-pdnsutil add-record ftl. https HTTPS '1 . alpn="h3,h2"'
+if ! pdnsutil add-record ftl. https HTTPS '1 . alpn="h3,h2"'; then
+  # comment above applies
+  pdnsutil add-record ftl. https TYPE65 "\# 15 000100000100080322683303683222"
+fi
 
 # Create reverse lookup zone
 pdnsutil create-zone arpa ns1.ftl
@@ -112,8 +119,6 @@ pdnsutil rectify-all-zones
 # Do final checking
 pdnsutil check-zone ftl
 pdnsutil check-zone arpa
-
-pdnsutil list-all-zones
 
 echo "********* Done installing PowerDNS configuration **********"
 
